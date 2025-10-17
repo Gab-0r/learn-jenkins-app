@@ -1,7 +1,7 @@
 pipeline {
     agent any
-
     stages {
+        
         stage('Build') {
             agent {
                 docker {
@@ -20,46 +20,49 @@ pipeline {
                 '''
             }
         }
-        
-        stage('Test stage'){
-            agent {
-                docker {
-                    image 'node:18-alpine'
-                    reuseNode true
+
+        stage('Run Tests') {
+            parallel{
+                stage('Test'){
+                    agent {
+                        docker {
+                            image 'node:18-alpine'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh '''
+                        echo 'Test stage'
+                        test -f build/index.html
+                        npm test
+                    '''
+                    }
+                }
+
+                stage('E2E'){
+                    agent {
+                        docker {
+                            image 'mcr.microsoft.com/playwright:v1.50.0-noble'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh '''
+                            npx playwright install chromium
+                            npm install serve
+                            node_modules/.bin/serve -s build &
+                            sleep 10
+                            npx playwright test --reporter=html
+                        '''
+                    }
                 }
             }
-            steps {
-                sh '''
-                echo 'Test stage'
-                test -f build/index.html
-                npm test
-            '''
-            }
         }
-
-        stage('E2E'){
-            agent {
-                docker {
-                    image 'mcr.microsoft.com/playwright:v1.50.0-noble'
-                    reuseNode true
-                }
-            }
-            steps {
-                sh '''
-                    npx playwright install chromium
-                    npm install serve
-                    node_modules/.bin/serve -s build &
-                    sleep 10
-                    npx playwright test --reporter=html
-                '''
-            }
-        }
-
     }
 
     post {
         always {
-            publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Playwright HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+             publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Playwright HTML Report', reportTitles: '', useWrapperFileDirectly: true])
         }
     }
 
