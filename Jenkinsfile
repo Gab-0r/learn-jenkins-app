@@ -1,5 +1,11 @@
 pipeline {
     agent any
+
+    environment{
+        NETLIFY_SITE_ID = '7c57050b-82d4-43e0-be0e-19b59e8a8f22'
+        NETLIFY_AUTH_TOKEN = credentials('netlify-token')
+    }
+
     stages {
         
         stage('Build') {
@@ -55,15 +61,30 @@ pipeline {
                             npx playwright test --reporter=html
                         '''
                     }
+                    post {
+                        always {
+                            publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Playwright HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+                        }
+                    }
                 }
             }
         }
-    }
 
-    post {
-        always {
-             publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Playwright HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+        stage('Deploy') {
+            agent {
+                docker {
+                    image 'node:18-alpine'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh '''
+                    npm install netlify-cli@20.1.1
+                    node-modules/.bin/netlify --version
+                    eco "Deploying to production. Site ID: $NETLIFY_SITE_ID"
+                    node-modules/.bin/netlify status
+                '''
+            }
         }
     }
-
 }
